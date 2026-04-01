@@ -3,15 +3,14 @@ local_ai.py — shared Ollama client for all projects.
 Drop-in replacement for paid API calls on simple/medium tasks.
 All calls are logged to ~/.local_llm_usage.db for monitoring.
 """
+import os
 import sqlite3
-import time
-import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
-OLLAMA_BASE = "http://localhost:11434"
+OLLAMA_BASE = os.environ.get("OLLAMA_BASE", "http://localhost:11434")
 DEFAULT_CODE_MODEL = "qwen2.5-coder:14b"
 DEFAULT_FAST_MODEL = "llama3.2:3b"
 
@@ -19,7 +18,7 @@ _DB_PATH = Path.home() / ".local_llm_usage.db"
 
 
 def _db():
-    conn = sqlite3.connect(_DB_PATH)
+    conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS calls (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +42,7 @@ def _log(model: str, caller: str, data: dict, error: str = None):
             "INSERT INTO calls (ts, model, caller, prompt_tokens, output_tokens, total_duration_ms, error) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 model,
                 caller,
                 data.get("prompt_eval_count"),
@@ -90,7 +89,7 @@ def is_available() -> bool:
         return False
 
 
-def list_models() -> list:
+def list_models() -> list[str]:
     try:
         return [m["name"] for m in requests.get(f"{OLLAMA_BASE}/api/tags", timeout=5).json().get("models", [])]
     except Exception:
@@ -120,3 +119,22 @@ def usage_summary(days: int = 7) -> dict:
         }
     except Exception:
         return {}
+
+
+def print_usage(days: int = 7):
+    """Print usage summary to stdout. Run: python -m auto_lib.local_ai [days]"""
+    summary = usage_summary(days=days)
+    if not summary:
+        print(f"No usage data for the last {days} days.")
+        return
+    print(f"\nLocal LLM Usage — last {days} days\n{'─' * 50}")
+    for model, stats in summary.items():
+        print(f"  {model}: {stats['calls']} calls, "
+              f"{stats['prompt_tokens']+stats['output_tokens']} tokens, "
+              f"avg {stats['avg_latency_ms']}ms, {stats['errors']} errors")
+
+
+if __name__ == "__main__":
+    import sys
+    days = int(sys.argv[1]) if len(sys.argv) > 1 else 7
+    print_usage(days)
