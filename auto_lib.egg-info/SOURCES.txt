@@ -1,0 +1,7 @@
+pyproject.toml
+auto_lib/__init__.py
+auto_lib.egg-info/PKG-INFO
+auto_lib.egg-info/SOURCES.txt
+auto_lib.egg-info/dependency_links.txt
+auto_lib.egg-info/requires.txt
+auto_lib.egg-info/top_level.txt

@@ -1,0 +1,6 @@
+requests
+python-dotenv
+anthropic
+pyyaml
+pytest
+pytest-mock
