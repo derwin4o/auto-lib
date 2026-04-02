@@ -25,20 +25,26 @@ class GitHubClient:
 
     def get_labeled_issues(self, label_names: List[str]) -> List[dict]:
         """Return open issues that have at least one of label_names and are not labeled 'wip'."""
-        resp = self._session.get(f"{self._base()}/issues", params={"state": "open", "per_page": 100})
-        resp.raise_for_status()
-        raw = resp.json()
-        if len(raw) == 100:
-            log.warning("get_labeled_issues for %s/%s returned 100 results — may be truncated", self._owner, self._repo)
         issues = []
-        for issue in raw:
-            if "pull_request" in issue:
-                continue
-            labels = {l["name"] for l in issue.get("labels", [])}
-            if "wip" in labels:
-                continue
-            if labels & set(label_names):
-                issues.append(issue)
+        page = 1
+        while True:
+            resp = self._session.get(
+                f"{self._base()}/issues",
+                params={"state": "open", "per_page": 100, "page": page},
+            )
+            resp.raise_for_status()
+            raw = resp.json()
+            for issue in raw:
+                if "pull_request" in issue:
+                    continue
+                labels = {l["name"] for l in issue.get("labels", [])}
+                if "wip" in labels:
+                    continue
+                if labels & set(label_names):
+                    issues.append(issue)
+            if len(raw) < 100:
+                break
+            page += 1
         return issues
 
     def get_wip_issues(self) -> List[dict]:
