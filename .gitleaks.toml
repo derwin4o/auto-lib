@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "api-key"
+description = "API Key"
+regex = '''(?i)api[_-]?key[_-]?[\"'\s]+([\w\-=]+)'''
+severity = "high"
