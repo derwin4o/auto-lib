@@ -6,6 +6,22 @@ import requests
 
 log = logging.getLogger(__name__)
 
+
+class RateLimitError(Exception):
+    """Raised when the GitHub API rate limit is hit. Callers should not increment
+    attempt counters — retry after reset_at (Unix timestamp)."""
+    def __init__(self, reset_at: int):
+        self.reset_at = reset_at
+        reset_str = time.strftime("%H:%M:%S", time.localtime(reset_at))
+        super().__init__(f"GitHub rate limit exceeded, resets at {reset_str}")
+
+
+def _check_rate_limit(resp: requests.Response) -> None:
+    """Raise RateLimitError if resp is a rate-limit 403 (X-RateLimit-Remaining: 0)."""
+    if resp.status_code == 403 and resp.headers.get("X-RateLimit-Remaining") == "0":
+        reset_at = int(resp.headers.get("X-RateLimit-Reset", time.time() + 3600))
+        raise RateLimitError(reset_at)
+
 GITHUB_API = "https://api.github.com"
 
 
@@ -54,6 +70,7 @@ class GitHubClient:
 
     def get_issue(self, issue_number: int) -> dict:
         resp = self._session.get(f"{self._base()}/issues/{issue_number}")
+        _check_rate_limit(resp)
         resp.raise_for_status()
         data = resp.json()
         return {"number": data["number"], "title": data["title"],
