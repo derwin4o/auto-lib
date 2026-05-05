@@ -68,7 +68,24 @@ def load_config(config_path: Path = None) -> Config:
         raw = yaml.safe_load(f) if config_path.suffix.lower() in (".yaml", ".yml") else json.load(f)
 
     if not os.environ.get("GITHUB_TOKEN"):
-        raise ValueError("Missing required environment variable: GITHUB_TOKEN")
+        # Fall back to macOS keychain via `gh auth token` to avoid plaintext
+        # tokens in .env / LaunchAgent plists. Same pattern as subnet_scout.py.
+        try:
+            import subprocess
+            res = subprocess.run(
+                ["gh", "auth", "token"],
+                capture_output=True, text=True, timeout=5, check=False,
+            )
+            tok = res.stdout.strip()
+            if res.returncode == 0 and tok.startswith(("ghp_", "gho_", "ghs_", "github_pat_")):
+                os.environ["GITHUB_TOKEN"] = tok
+        except Exception:
+            pass
+    if not os.environ.get("GITHUB_TOKEN"):
+        raise ValueError(
+            "Missing GITHUB_TOKEN — not in env, and `gh auth token` returned nothing. "
+            "Run `gh auth login` once to populate the keychain, or set GITHUB_TOKEN in env."
+        )
 
     state_store = StateStoreConfig(**raw.get("state_store", {"type": "file"}))
 
