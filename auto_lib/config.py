@@ -15,6 +15,12 @@ class RepoConfig:
     name: str
     local_path: str
     merge_strategy: str = "pr"  # "pr" or "direct"
+    # When True (default for back-compat), the orchestrator merges the PR
+    # automatically after the code-reviewer gate passes. Set to False for
+    # repos where you want manual review before any merge to main — the
+    # orchestrator still opens the PR and runs the reviewer, but stops
+    # short of merging. The PR sits with `needs-review` label.
+    auto_merge: bool = True
 
 
 @dataclass
